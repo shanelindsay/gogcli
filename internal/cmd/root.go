@@ -23,7 +23,7 @@ func Execute(args []string) error {
 
 	root := &cobra.Command{
 		Use:           "gog",
-		Short:         "Google CLI for Gmail/Calendar/Drive/Contacts",
+		Short:         "Google CLI for Gmail/Calendar/Drive/Contacts/Tasks",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
