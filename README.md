@@ -112,7 +112,14 @@ Contacts:
 Tasks:
 
 - `gog tasks lists --max 50`
+- `gog tasks lists create <title>`
 - `gog tasks list <tasklistId> --max 50`
+- `gog tasks add <tasklistId> --title "Task title"`
+- `gog tasks update <tasklistId> <taskId> --title "New title"`
+- `gog tasks done <tasklistId> <taskId>`
+- `gog tasks undo <tasklistId> <taskId>`
+- `gog tasks delete <tasklistId> <taskId>`
+- `gog tasks clear <tasklistId>`
 
 Workspace directory (requires Google Workspace account; `@gmail.com` won’t work):
 

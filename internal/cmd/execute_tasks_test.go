@@ -334,3 +334,165 @@ func TestExecute_TasksDelete_JSON(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", parsed)
 	}
 }
+
+func TestExecute_TasksUpdate_JSON(t *testing.T) {
+	origNew := newTasksService
+	t.Cleanup(func() { newTasksService = origNew })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.URL.Path == "/tasks/v1/lists/l1/tasks/t1" && r.Method == http.MethodPatch) {
+			http.NotFound(w, r)
+			return
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body["title"] != "New title" {
+			http.Error(w, "expected title New title", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "t1",
+			"title":  "New title",
+			"status": "needsAction",
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := tasks.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newTasksService = func(context.Context, string) (*tasks.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--output", "json", "--account", "a@b.com", "tasks", "update", "l1", "t1", "--title", "New title"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var parsed struct {
+		Task struct {
+			ID     string `json:"id"`
+			Title  string `json:"title"`
+			Status string `json:"status"`
+		} `json:"task"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if parsed.Task.ID != "t1" || parsed.Task.Title != "New title" || parsed.Task.Status != "needsAction" {
+		t.Fatalf("unexpected task: %#v", parsed.Task)
+	}
+}
+
+func TestExecute_TasksUndo_JSON(t *testing.T) {
+	origNew := newTasksService
+	t.Cleanup(func() { newTasksService = origNew })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.URL.Path == "/tasks/v1/lists/l1/tasks/t1" && r.Method == http.MethodPatch) {
+			http.NotFound(w, r)
+			return
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body["status"] != "needsAction" {
+			http.Error(w, "expected status needsAction", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "t1",
+			"status": "needsAction",
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := tasks.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newTasksService = func(context.Context, string) (*tasks.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--output", "json", "--account", "a@b.com", "tasks", "undo", "l1", "t1"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var parsed struct {
+		Task struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"task"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if parsed.Task.ID != "t1" || parsed.Task.Status != "needsAction" {
+		t.Fatalf("unexpected task: %#v", parsed.Task)
+	}
+}
+
+func TestExecute_TasksClear_JSON(t *testing.T) {
+	origNew := newTasksService
+	t.Cleanup(func() { newTasksService = origNew })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.URL.Path == "/tasks/v1/lists/l1/clear" && r.Method == http.MethodPost) {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{})
+	}))
+	defer srv.Close()
+
+	svc, err := tasks.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newTasksService = func(context.Context, string) (*tasks.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--output", "json", "--account", "a@b.com", "tasks", "clear", "l1"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var parsed struct {
+		Cleared    bool   `json:"cleared"`
+		TasklistID string `json:"tasklistId"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if !parsed.Cleared || parsed.TasklistID != "l1" {
+		t.Fatalf("unexpected response: %#v", parsed)
+	}
+}
