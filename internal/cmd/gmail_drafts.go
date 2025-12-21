@@ -293,6 +293,7 @@ func newGmailDraftsCreateCmd(flags *rootFlags) *cobra.Command {
 	var body string
 	var bodyHTML string
 	var replyTo string
+	var replyToAddress string
 	var attach []string
 
 	cmd := &cobra.Command{
@@ -332,6 +333,7 @@ func newGmailDraftsCreateCmd(flags *rootFlags) *cobra.Command {
 				To:          splitCSV(to),
 				Cc:          splitCSV(cc),
 				Bcc:         splitCSV(bcc),
+				ReplyTo:     replyToAddress,
 				Subject:     subject,
 				Body:        body,
 				BodyHTML:    bodyHTML,
@@ -379,6 +381,7 @@ func newGmailDraftsCreateCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&body, "body", "", "Body (plain text; required unless --body-html is set)")
 	cmd.Flags().StringVar(&bodyHTML, "body-html", "", "Body (HTML; optional)")
 	cmd.Flags().StringVar(&replyTo, "reply-to", "", "Reply to message ID (sets In-Reply-To/References and thread)")
+	cmd.Flags().StringVar(&replyToAddress, "reply-to-address", "", "Reply-To header address")
 	cmd.Flags().StringSliceVar(&attach, "attach", nil, "Attachment file path (repeatable)")
 	return cmd
 }
