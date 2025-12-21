@@ -27,6 +27,7 @@ type mailOptions struct {
 	To                []string
 	Cc                []string
 	Bcc               []string
+	ReplyTo           string
 	Subject           string
 	Body              string
 	BodyHTML          string
@@ -65,6 +66,12 @@ func buildRFC822(opts mailOptions) ([]byte, error) {
 	}
 	if len(opts.Bcc) > 0 {
 		writeHeader(&b, "Bcc", strings.Join(opts.Bcc, ", "))
+	}
+	if strings.TrimSpace(opts.ReplyTo) != "" {
+		if err := validateHeaderValue(opts.ReplyTo); err != nil {
+			return nil, fmt.Errorf("invalid Reply-To: %w", err)
+		}
+		writeHeader(&b, "Reply-To", strings.TrimSpace(opts.ReplyTo))
 	}
 	if err := validateHeaderValue(opts.Subject); err != nil {
 		return nil, fmt.Errorf("invalid Subject: %w", err)

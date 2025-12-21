@@ -136,6 +136,23 @@ func TestBuildRFC822UTF8Subject(t *testing.T) {
 	}
 }
 
+func TestBuildRFC822ReplyToHeader(t *testing.T) {
+	raw, err := buildRFC822(mailOptions{
+		From:    "a@b.com",
+		To:      []string{"c@d.com"},
+		ReplyTo: "reply@example.com",
+		Subject: "Hi",
+		Body:    "Hello",
+	})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "Reply-To: reply@example.com") {
+		t.Fatalf("missing Reply-To header: %q", s)
+	}
+}
+
 func TestEncodeHeaderIfNeeded(t *testing.T) {
 	if got := encodeHeaderIfNeeded("Hello"); got != "Hello" {
 		t.Fatalf("unexpected: %q", got)
