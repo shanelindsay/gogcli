@@ -125,8 +125,6 @@ func Execute(args []string) error {
 	root.PersistentFlags().BoolVar(&flags.Force, "force", false, "Skip confirmations for destructive commands")
 	root.PersistentFlags().BoolVar(&flags.NoInput, "no-input", false, "Never prompt; fail instead (useful for CI)")
 	root.PersistentFlags().BoolVar(&flags.Verbose, "verbose", false, "Enable verbose logging")
-	root.PersistentFlags().BoolVar(&flags.Verbose, "debug", false, "Deprecated alias for --verbose")
-	_ = root.PersistentFlags().MarkHidden("debug")
 
 	root.AddCommand(newAuthCmd(&flags))
 	root.AddCommand(newDriveCmd(&flags))
