@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -19,6 +20,8 @@ type Store interface {
 	GetToken(email string) (Token, error)
 	DeleteToken(email string) error
 	ListTokens() ([]Token, error)
+	GetDefaultAccount() (string, error)
+	SetDefaultAccount(email string) error
 }
 
 type KeyringStore struct {
@@ -181,4 +184,28 @@ func tokenKey(email string) string {
 
 func normalize(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
+}
+
+const defaultAccountKey = "default_account"
+
+func (s *KeyringStore) GetDefaultAccount() (string, error) {
+	it, err := s.ring.Get(defaultAccountKey)
+	if err != nil {
+		if errors.Is(err, keyring.ErrKeyNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return string(it.Data), nil
+}
+
+func (s *KeyringStore) SetDefaultAccount(email string) error {
+	email = normalize(email)
+	if email == "" {
+		return fmt.Errorf("missing email")
+	}
+	return s.ring.Set(keyring.Item{
+		Key:  defaultAccountKey,
+		Data: []byte(email),
+	})
 }

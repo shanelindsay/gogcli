@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -169,11 +170,13 @@ func (s *gmailWatchServer) handlePush(ctx context.Context, payload gmailPushPayl
 	if historyResp != nil && historyResp.HistoryId != 0 {
 		nextHistoryID = formatHistoryID(historyResp.HistoryId)
 	}
-	_ = store.Update(func(state *gmailWatchState) error {
+	if err := store.Update(func(state *gmailWatchState) error {
 		state.HistoryID = nextHistoryID
 		state.UpdatedAtMs = time.Now().UnixMilli()
 		return nil
-	})
+	}); err != nil {
+		s.warnf("watch: failed to update state: %v", err)
+	}
 
 	return &gmailHookPayload{
 		Source:    "gmail",
@@ -199,11 +202,13 @@ func (s *gmailWatchServer) resyncHistory(ctx context.Context, svc *gmail.Service
 		return nil, err
 	}
 
-	_ = s.store.Update(func(state *gmailWatchState) error {
+	if err := s.store.Update(func(state *gmailWatchState) error {
 		state.HistoryID = historyID
 		state.UpdatedAtMs = time.Now().UnixMilli()
 		return nil
-	})
+	}); err != nil {
+		s.warnf("watch: failed to update state after resync: %v", err)
+	}
 
 	return &gmailHookPayload{
 		Source:    "gmail",
@@ -346,11 +351,17 @@ func bearerToken(r *http.Request) string {
 }
 
 func sharedTokenMatches(r *http.Request, expected string) bool {
+	if expected == "" {
+		return false
+	}
 	token := r.Header.Get("x-gog-token")
 	if token == "" {
 		token = r.URL.Query().Get("token")
 	}
-	return token != "" && token == expected
+	if token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
 }
 
 func verifyOIDCToken(ctx context.Context, validator *idtoken.Validator, token, audience, expectedEmail string) (bool, error) {

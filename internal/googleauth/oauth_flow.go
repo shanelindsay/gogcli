@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"net/url"
@@ -99,7 +100,7 @@ func Authorize(ctx context.Context, opts AuthorizeOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	port := ln.Addr().(*net.TCPAddr).Port
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/oauth2/callback", port)
@@ -122,13 +123,15 @@ func Authorize(ctx context.Context, opts AuthorizeOptions) (string, error) {
 				return
 			}
 			q := r.URL.Query()
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
 			if q.Get("error") != "" {
 				select {
 				case errCh <- fmt.Errorf("authorization error: %s", q.Get("error")):
 				default:
 				}
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte("Authorization cancelled. You can close this window."))
+				renderCancelledPage(w)
 				return
 			}
 			if q.Get("state") != state {
@@ -137,7 +140,7 @@ func Authorize(ctx context.Context, opts AuthorizeOptions) (string, error) {
 				default:
 				}
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte("State mismatch. You can close this window."))
+				renderErrorPage(w, "State mismatch - possible CSRF attack. Please try again.")
 				return
 			}
 			code := q.Get("code")
@@ -147,7 +150,7 @@ func Authorize(ctx context.Context, opts AuthorizeOptions) (string, error) {
 				default:
 				}
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte("Missing code. You can close this window."))
+				renderErrorPage(w, "Missing authorization code. Please try again.")
 				return
 			}
 			select {
@@ -155,7 +158,7 @@ func Authorize(ctx context.Context, opts AuthorizeOptions) (string, error) {
 			default:
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("Success! You can close this window."))
+			renderSuccessPage(w)
 		}),
 	}
 
@@ -229,4 +232,34 @@ func extractCodeAndState(rawURL string) (code string, state string, err error) {
 		return "", "", errors.New("no code found in URL")
 	}
 	return code, q.Get("state"), nil
+}
+
+// renderSuccessPage renders the success HTML template
+func renderSuccessPage(w http.ResponseWriter) {
+	tmpl, err := template.New("success").Parse(successTemplate)
+	if err != nil {
+		_, _ = w.Write([]byte("Success! You can close this window."))
+		return
+	}
+	_ = tmpl.Execute(w, nil)
+}
+
+// renderErrorPage renders the error HTML template with the given message
+func renderErrorPage(w http.ResponseWriter, errorMsg string) {
+	tmpl, err := template.New("error").Parse(errorTemplate)
+	if err != nil {
+		_, _ = w.Write([]byte("Error: " + errorMsg))
+		return
+	}
+	_ = tmpl.Execute(w, struct{ Error string }{Error: errorMsg})
+}
+
+// renderCancelledPage renders the cancelled HTML template
+func renderCancelledPage(w http.ResponseWriter) {
+	tmpl, err := template.New("cancelled").Parse(cancelledTemplate)
+	if err != nil {
+		_, _ = w.Write([]byte("Authorization cancelled. You can close this window."))
+		return
+	}
+	_ = tmpl.Execute(w, nil)
 }

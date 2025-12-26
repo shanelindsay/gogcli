@@ -2,6 +2,15 @@
 
 ## 0.3.1 - Unreleased
 
+### Added
+
+- Resilience: automatic retries + circuit breaker for Google API calls (429/5xx).
+- Gmail: batch ops + settings commands (autoforward, delegates, filters, forwarding, send-as, vacation).
+- Calendar: colors, conflicts, search, multi-timezone time.
+- Sheets: read/write/update/append/clear + create spreadsheets.
+- Auth: browser-based accounts manager (`gog auth manage`).
+- DX: shell completion (`gog completion ...`) and `--debug` logging.
+
 ## 0.3.0 - 2025-12-26
 
 ### Added

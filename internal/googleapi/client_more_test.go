@@ -21,6 +21,8 @@ func (s *stubStore) Keys() ([]string, error)              { return nil, nil }
 func (s *stubStore) SetToken(string, secrets.Token) error { return nil }
 func (s *stubStore) DeleteToken(string) error             { return nil }
 func (s *stubStore) ListTokens() ([]secrets.Token, error) { return nil, nil }
+func (s *stubStore) GetDefaultAccount() (string, error)   { return "", nil }
+func (s *stubStore) SetDefaultAccount(string) error       { return nil }
 func (s *stubStore) GetToken(email string) (secrets.Token, error) {
 	s.lastEmail = email
 	if s.err != nil {

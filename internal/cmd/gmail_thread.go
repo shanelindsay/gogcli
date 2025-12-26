@@ -36,7 +36,7 @@ func newGmailThreadCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			thread, err := svc.Users.Threads.Get("me", threadID).Format("full").Do()
+			thread, err := svc.Users.Threads.Get("me", threadID).Format("full").Context(cmd.Context()).Do()
 			if err != nil {
 				return err
 			}
@@ -235,39 +235,11 @@ func findPartBody(p *gmail.MessagePart, mimeType string) string {
 }
 
 func decodeBase64URL(s string) (string, error) {
-	b, err := decodeBase64URLBytes(s)
+	b, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return "", err
 	}
 	return string(b), nil
-}
-
-func decodeBase64URLBytes(s string) ([]byte, error) {
-	var filtered []byte
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case ' ', '\n', '\r', '\t':
-			if filtered == nil {
-				filtered = make([]byte, 0, len(s))
-				filtered = append(filtered, s[:i]...)
-			}
-			continue
-		default:
-			if filtered != nil {
-				filtered = append(filtered, s[i])
-			}
-		}
-	}
-	if filtered != nil {
-		s = string(filtered)
-	}
-
-	b, err := base64.RawURLEncoding.DecodeString(s)
-	if err == nil {
-		return b, nil
-	}
-	// Gmail API returns base64url; some responses include padding.
-	return base64.URLEncoding.DecodeString(s)
 }
 
 func downloadAttachment(cmd *cobra.Command, svc *gmail.Service, messageID string, a attachmentInfo, dir string) (string, bool, error) {
@@ -278,7 +250,12 @@ func downloadAttachment(cmd *cobra.Command, svc *gmail.Service, messageID string
 	if len(shortID) > 8 {
 		shortID = shortID[:8]
 	}
-	filename := fmt.Sprintf("%s_%s_%s", messageID, shortID, a.Filename)
+	// Sanitize filename to prevent path traversal attacks
+	safeFilename := filepath.Base(a.Filename)
+	if safeFilename == "" || safeFilename == "." || safeFilename == ".." {
+		safeFilename = "attachment"
+	}
+	filename := fmt.Sprintf("%s_%s_%s", messageID, shortID, safeFilename)
 	outPath := filepath.Join(dir, filename)
 
 	if st, err := os.Stat(outPath); err == nil && st.Size() == a.Size && a.Size > 0 {
@@ -292,7 +269,7 @@ func downloadAttachment(cmd *cobra.Command, svc *gmail.Service, messageID string
 	if body == nil || body.Data == "" {
 		return "", false, errors.New("empty attachment data")
 	}
-	data, err := decodeBase64URLBytes(body.Data)
+	data, err := base64.RawURLEncoding.DecodeString(body.Data)
 	if err != nil {
 		return "", false, err
 	}

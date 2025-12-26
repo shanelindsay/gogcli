@@ -79,6 +79,14 @@ func (s *memSecretsStore) ListTokens() ([]secrets.Token, error) {
 	return out, nil
 }
 
+func (s *memSecretsStore) GetDefaultAccount() (string, error) {
+	return "", nil
+}
+
+func (s *memSecretsStore) SetDefaultAccount(email string) error {
+	return nil
+}
+
 func TestAuthTokens_ExportImportRoundtrip_JSON(t *testing.T) {
 	origOpen := openSecretsStore
 	t.Cleanup(func() { openSecretsStore = origOpen })

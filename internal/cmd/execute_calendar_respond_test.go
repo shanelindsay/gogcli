@@ -35,7 +35,7 @@ func TestExecute_CalendarRespond_JSON(t *testing.T) {
 				},
 			})
 			return
-		case http.MethodPut:
+		case http.MethodPatch:
 			if got := r.URL.Query().Get("sendUpdates"); got != "" {
 				t.Fatalf("expected no sendUpdates by default, got %q", got)
 			}

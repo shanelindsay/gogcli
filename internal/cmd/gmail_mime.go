@@ -232,8 +232,8 @@ func writeBodyWithTrailingCRLF(b *bytes.Buffer, body string) {
 }
 
 func writeTextPart(b *bytes.Buffer, boundary string, contentType string, body string) {
-	b.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	b.WriteString(fmt.Sprintf("Content-Type: %s\r\n", contentType))
+	_, _ = fmt.Fprintf(b, "--%s\r\n", boundary)
+	_, _ = fmt.Fprintf(b, "Content-Type: %s\r\n", contentType)
 	b.WriteString("Content-Transfer-Encoding: 7bit\r\n\r\n")
 	writeBodyWithTrailingCRLF(b, body)
 }

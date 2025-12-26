@@ -82,6 +82,7 @@ func newDriveLsCmd(flags *rootFlags) *cobra.Command {
 				SupportsAllDrives(true).
 				IncludeItemsFromAllDrives(true).
 				Fields("nextPageToken, files(id, name, mimeType, size, modifiedTime, parents, webViewLink)").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -164,6 +165,7 @@ func newDriveSearchCmd(flags *rootFlags) *cobra.Command {
 				SupportsAllDrives(true).
 				IncludeItemsFromAllDrives(true).
 				Fields("nextPageToken, files(id, name, mimeType, size, modifiedTime, parents, webViewLink)").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -236,6 +238,7 @@ func newDriveGetCmd(flags *rootFlags) *cobra.Command {
 			f, err := svc.Files.Get(fileID).
 				SupportsAllDrives(true).
 				Fields("id, name, mimeType, size, modifiedTime, createdTime, parents, webViewLink, description, starred").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -287,6 +290,7 @@ func newDriveDownloadCmd(flags *rootFlags) *cobra.Command {
 			meta, err := svc.Files.Get(fileID).
 				SupportsAllDrives(true).
 				Fields("id, name, mimeType").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -296,14 +300,20 @@ func newDriveDownloadCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			destPath := strings.TrimSpace(outPathFlag)
+			// Sanitize filename to prevent path traversal.
+			safeName := filepath.Base(meta.Name)
+			if safeName == "" || safeName == "." || safeName == ".." {
+				safeName = "download"
+			}
+			defaultName := fmt.Sprintf("%s_%s", fileID, safeName)
 			if destPath == "" {
 				dir, dirErr := config.EnsureDriveDownloadsDir()
 				if dirErr != nil {
 					return dirErr
 				}
-				destPath = filepath.Join(dir, fmt.Sprintf("%s_%s", fileID, meta.Name))
+				destPath = filepath.Join(dir, defaultName)
 			} else if st, statErr := os.Stat(destPath); statErr == nil && st.IsDir() {
-				destPath = filepath.Join(destPath, fmt.Sprintf("%s_%s", fileID, meta.Name))
+				destPath = filepath.Join(destPath, defaultName)
 			}
 
 			downloadedPath, size, err := downloadDriveFile(cmd.Context(), svc, meta, destPath)
@@ -371,6 +381,7 @@ func newDriveUploadCmd(flags *rootFlags) *cobra.Command {
 				SupportsAllDrives(true).
 				Media(f, gapi.ContentType(mimeType)).
 				Fields("id, name, mimeType, size, webViewLink").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -426,6 +437,7 @@ func newDriveMkdirCmd(flags *rootFlags) *cobra.Command {
 			created, err := svc.Files.Create(f).
 				SupportsAllDrives(true).
 				Fields("id, name, webViewLink").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -470,7 +482,7 @@ func newDriveDeleteCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			if err := svc.Files.Delete(fileID).SupportsAllDrives(true).Do(); err != nil {
+			if err := svc.Files.Delete(fileID).SupportsAllDrives(true).Context(cmd.Context()).Do(); err != nil {
 				return err
 			}
 			if outfmt.IsJSON(cmd.Context()) {
@@ -513,6 +525,7 @@ func newDriveMoveCmd(flags *rootFlags) *cobra.Command {
 			meta, err := svc.Files.Get(fileID).
 				SupportsAllDrives(true).
 				Fields("id, name, parents").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -526,7 +539,7 @@ func newDriveMoveCmd(flags *rootFlags) *cobra.Command {
 				call = call.RemoveParents(strings.Join(meta.Parents, ","))
 			}
 
-			updated, err := call.Do()
+			updated, err := call.Context(cmd.Context()).Do()
 			if err != nil {
 				return err
 			}
@@ -567,6 +580,7 @@ func newDriveRenameCmd(flags *rootFlags) *cobra.Command {
 			updated, err := svc.Files.Update(fileID, &drive.File{Name: newName}).
 				SupportsAllDrives(true).
 				Fields("id, name").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -629,12 +643,13 @@ func newDriveShareCmd(flags *rootFlags) *cobra.Command {
 				SupportsAllDrives(true).
 				SendNotificationEmail(false).
 				Fields("id, type, role, emailAddress").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
 			}
 
-			link, err := driveWebLink(svc, fileID)
+			link, err := driveWebLink(cmd.Context(), svc, fileID)
 			if err != nil {
 				return err
 			}
@@ -683,7 +698,7 @@ func newDriveUnshareCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			if err := svc.Permissions.Delete(fileID, permissionID).SupportsAllDrives(true).Do(); err != nil {
+			if err := svc.Permissions.Delete(fileID, permissionID).SupportsAllDrives(true).Context(cmd.Context()).Do(); err != nil {
 				return err
 			}
 
@@ -729,6 +744,7 @@ func newDrivePermissionsCmd(flags *rootFlags) *cobra.Command {
 				PageToken(page).
 				SupportsAllDrives(true).
 				Fields("nextPageToken, permissions(id, type, role, emailAddress)").
+				Context(cmd.Context()).
 				Do()
 			if err != nil {
 				return err
@@ -794,7 +810,7 @@ func newDriveURLCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			for _, id := range args {
-				link, err := driveWebLink(svc, id)
+				link, err := driveWebLink(cmd.Context(), svc, id)
 				if err != nil {
 					return err
 				}
@@ -807,7 +823,7 @@ func newDriveURLCmd(flags *rootFlags) *cobra.Command {
 			if outfmt.IsJSON(cmd.Context()) {
 				urls := make([]map[string]string, 0, len(args))
 				for _, id := range args {
-					link, err := driveWebLink(svc, id)
+					link, err := driveWebLink(cmd.Context(), svc, id)
 					if err != nil {
 						return err
 					}
@@ -840,7 +856,10 @@ func buildDriveSearchQuery(text string) string {
 }
 
 func escapeDriveQueryString(s string) string {
-	return strings.ReplaceAll(s, "'", "\\'")
+	// Escape backslashes first, then single quotes
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "'", "\\'")
+	return s
 }
 
 func driveType(mimeType string) string {
@@ -1005,8 +1024,8 @@ func driveExportExtension(mimeType string) string {
 	}
 }
 
-func driveWebLink(svc *drive.Service, fileID string) (string, error) {
-	f, err := svc.Files.Get(fileID).SupportsAllDrives(true).Fields("webViewLink").Do()
+func driveWebLink(ctx context.Context, svc *drive.Service, fileID string) (string, error) {
+	f, err := svc.Files.Get(fileID).SupportsAllDrives(true).Fields("webViewLink").Context(ctx).Do()
 	if err != nil {
 		return "", err
 	}

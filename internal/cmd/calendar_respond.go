@@ -13,12 +13,21 @@ import (
 
 func newCalendarRespondCmd(flags *rootFlags) *cobra.Command {
 	var status string
-	var sendUpdates string
+	var comment string
 
 	cmd := &cobra.Command{
 		Use:   "respond <calendarId> <eventId>",
-		Short: "Respond to a meeting invitation (accept/decline/tentative)",
-		Args:  cobra.ExactArgs(2),
+		Short: "Respond to a calendar event invitation",
+		Long: `Respond to a calendar event invitation with accepted, declined, tentative, or needsAction.
+
+Status values:
+  - accepted: Accept the invitation
+  - declined: Decline the invitation
+  - tentative: Mark as tentative (maybe)
+  - needsAction: Reset to needs action
+
+You can optionally include a comment with your response.`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			u := ui.FromContext(cmd.Context())
 			account, err := requireAccount(flags)
@@ -28,18 +37,18 @@ func newCalendarRespondCmd(flags *rootFlags) *cobra.Command {
 			calendarID := args[0]
 			eventID := args[1]
 
+			// Validate status
 			status = strings.TrimSpace(status)
-			switch status {
-			case "accepted", "declined", "tentative":
-			default:
-				return fmt.Errorf("invalid --status: %q (expected accepted|declined|tentative)", status)
+			validStatuses := []string{"accepted", "declined", "tentative", "needsAction"}
+			isValid := false
+			for _, v := range validStatuses {
+				if status == v {
+					isValid = true
+					break
+				}
 			}
-
-			sendUpdates = strings.TrimSpace(sendUpdates)
-			switch sendUpdates {
-			case "all", "none", "externalOnly":
-			default:
-				return fmt.Errorf("invalid --send-updates: %q (expected all|none|externalOnly)", sendUpdates)
+			if !isValid {
+				return fmt.Errorf("invalid status %q; must be one of: %s", status, strings.Join(validStatuses, ", "))
 			}
 
 			svc, err := newCalendarService(cmd.Context(), account)
@@ -47,33 +56,42 @@ func newCalendarRespondCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			e, err := svc.Events.Get(calendarID, eventID).Do()
+			// Get the event
+			event, err := svc.Events.Get(calendarID, eventID).Do()
 			if err != nil {
 				return err
 			}
-			if e == nil || len(e.Attendees) == 0 {
+
+			// Find the authenticated user in attendees
+			if len(event.Attendees) == 0 {
 				return errors.New("event has no attendees")
 			}
 
-			updatedAny := false
-			for _, a := range e.Attendees {
-				if a == nil {
-					continue
+			var selfAttendee *int
+			for i, a := range event.Attendees {
+				if a.Self {
+					selfAttendee = &i
+					break
 				}
-				if a.Self || strings.EqualFold(a.Email, account) {
-					a.ResponseStatus = status
-					updatedAny = true
-				}
-			}
-			if !updatedAny {
-				return errors.New("no attendee matches the authenticated user")
 			}
 
-			call := svc.Events.Update(calendarID, eventID, e)
-			if sendUpdates != "none" {
-				call = call.SendUpdates(sendUpdates)
+			if selfAttendee == nil {
+				return errors.New("you are not an attendee of this event")
 			}
-			updated, err := call.Do()
+
+			// Check if user is the organizer
+			if event.Attendees[*selfAttendee].Organizer {
+				return errors.New("cannot respond to your own event (you are the organizer)")
+			}
+
+			// Update the attendee's response status
+			event.Attendees[*selfAttendee].ResponseStatus = status
+			if strings.TrimSpace(comment) != "" {
+				event.Attendees[*selfAttendee].Comment = comment
+			}
+
+			// Patch the event with updated attendees
+			updated, err := svc.Events.Patch(calendarID, eventID, event).Do()
 			if err != nil {
 				return err
 			}
@@ -83,8 +101,11 @@ func newCalendarRespondCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			u.Out().Printf("id\t%s", updated.Id)
-			u.Out().Printf("status\t%s", status)
-			u.Out().Printf("send_updates\t%s", sendUpdates)
+			u.Out().Printf("summary\t%s", orEmpty(updated.Summary, "(no title)"))
+			u.Out().Printf("response_status\t%s", status)
+			if strings.TrimSpace(comment) != "" {
+				u.Out().Printf("comment\t%s", comment)
+			}
 			if updated.HtmlLink != "" {
 				u.Out().Printf("link\t%s", updated.HtmlLink)
 			}
@@ -92,8 +113,9 @@ func newCalendarRespondCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&status, "status", "", "Response status: accepted|declined|tentative (required)")
+	cmd.Flags().StringVar(&status, "status", "", "Response status (accepted, declined, tentative, needsAction) (required)")
+	cmd.Flags().StringVar(&comment, "comment", "", "Optional comment/note to include with response")
 	_ = cmd.MarkFlagRequired("status")
-	cmd.Flags().StringVar(&sendUpdates, "send-updates", "none", "Send updates: all|none|externalOnly (default: none)")
+
 	return cmd
 }

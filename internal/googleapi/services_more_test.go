@@ -35,6 +35,9 @@ func TestNewServices_HappyPath(t *testing.T) {
 	if svc, err := NewCalendar(ctx, "a@b.com"); err != nil || svc == nil {
 		t.Fatalf("NewCalendar: %v", err)
 	}
+	if svc, err := NewSheets(ctx, "a@b.com"); err != nil || svc == nil {
+		t.Fatalf("NewSheets: %v", err)
+	}
 	if svc, err := NewPeopleContacts(ctx, "a@b.com"); err != nil || svc == nil {
 		t.Fatalf("NewPeopleContacts: %v", err)
 	}
@@ -43,9 +46,6 @@ func TestNewServices_HappyPath(t *testing.T) {
 	}
 	if svc, err := NewPeopleDirectory(ctx, "a@b.com"); err != nil || svc == nil {
 		t.Fatalf("NewPeopleDirectory: %v", err)
-	}
-	if svc, err := NewTasks(ctx, "a@b.com"); err != nil || svc == nil {
-		t.Fatalf("NewTasks: %v", err)
 	}
 }
 

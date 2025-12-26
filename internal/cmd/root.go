@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -20,6 +21,7 @@ type rootFlags struct {
 	Plain   bool
 	Force   bool
 	NoInput bool
+	Debug   bool
 }
 
 func Execute(args []string) error {
@@ -76,10 +78,21 @@ func Execute(args []string) error {
 	  # People
 	  gog people me
 
+	  # Sheets
+	  gog sheets get <spreadsheetId> 'Sheet1!A1:C10'
+
 	  # Parseable output
 	  gog --json drive ls --max 5 | jq .
 	`),
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			logLevel := slog.LevelWarn
+			if flags.Debug {
+				logLevel = slog.LevelDebug
+			}
+			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+				Level: logLevel,
+			})))
+
 			mode, err := outfmt.FromFlags(flags.JSON, flags.Plain)
 			if err != nil {
 				return err
@@ -106,11 +119,12 @@ func Execute(args []string) error {
 
 	root.SetArgs(args)
 	root.PersistentFlags().StringVar(&flags.Color, "color", flags.Color, "Color output: auto|always|never")
-	root.PersistentFlags().StringVar(&flags.Account, "account", "", "Account email for API commands (gmail/calendar/drive/contacts/tasks/people)")
+	root.PersistentFlags().StringVar(&flags.Account, "account", "", "Account email for API commands (gmail/calendar/drive/contacts/tasks/people/sheets)")
 	root.PersistentFlags().BoolVar(&flags.JSON, "json", flags.JSON, "Output JSON to stdout (best for scripting)")
 	root.PersistentFlags().BoolVar(&flags.Plain, "plain", flags.Plain, "Output stable, parseable text to stdout (TSV; no colors)")
 	root.PersistentFlags().BoolVar(&flags.Force, "force", false, "Skip confirmations for destructive commands")
 	root.PersistentFlags().BoolVar(&flags.NoInput, "no-input", false, "Never prompt; fail instead (useful for CI)")
+	root.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Enable debug logging")
 
 	root.AddCommand(newAuthCmd(&flags))
 	root.AddCommand(newDriveCmd(&flags))
@@ -119,12 +133,14 @@ func Execute(args []string) error {
 	root.AddCommand(newContactsCmd(&flags))
 	root.AddCommand(newTasksCmd(&flags))
 	root.AddCommand(newPeopleCmd(&flags))
+	root.AddCommand(newSheetsCmd(&flags))
 	root.AddCommand(newVersionCmd())
 
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		// pflag already includes helpful context ("unknown flag", "invalid argument", ...).
 		return newUsageError(err)
 	})
+	root.AddCommand(newCompletionCmd())
 
 	err := root.Execute()
 	if err == nil {
