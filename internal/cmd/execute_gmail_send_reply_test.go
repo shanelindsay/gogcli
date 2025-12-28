@@ -18,6 +18,8 @@ func TestExecute_GmailSend_ReplyToHeader(t *testing.T) {
 	origNew := newGmailService
 	t.Cleanup(func() { newGmailService = origNew })
 
+	t.Setenv("GOG_GMAIL_ALLOWLIST_MODE", "off")
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/gmail/v1/users/me/messages/send"):
@@ -76,6 +78,8 @@ func TestExecute_GmailSend_ReplyToHeader(t *testing.T) {
 func TestExecute_GmailSend_ReplyToMessageID(t *testing.T) {
 	origNew := newGmailService
 	t.Cleanup(func() { newGmailService = origNew })
+
+	t.Setenv("GOG_GMAIL_ALLOWLIST_MODE", "off")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
