@@ -65,10 +65,15 @@ func OpenDefault() (Store, error) {
 		return nil, err
 	}
 
+	fileDir := strings.TrimSpace(os.Getenv("GOG_KEYRING_FILE_DIR"))
+	if fileDir == "" {
+		fileDir = keyringDir
+	}
+
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:              config.AppName,
 		KeychainTrustApplication: runtime.GOOS == "darwin",
-		FileDir:                  keyringDir,
+		FileDir:                  fileDir,
 		FilePasswordFunc:         fileKeyringPasswordFunc(),
 	})
 	if err != nil {
