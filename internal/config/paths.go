@@ -85,6 +85,14 @@ func GmailAttachmentsDir() (string, error) {
 	return filepath.Join(dir, "gmail-attachments"), nil
 }
 
+func GmailAllowlistPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "gmail-allowlist.txt"), nil
+}
+
 func EnsureGmailAttachmentsDir() (string, error) {
 	dir, err := GmailAttachmentsDir()
 	if err != nil {
