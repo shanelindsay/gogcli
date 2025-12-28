@@ -45,6 +45,16 @@ To see available send-as aliases: gog gmail sendas list`,
 				return usage("required: --body or --body-html")
 			}
 
+			recipients := append([]string{}, splitCSV(to)...)
+			recipients = append(recipients, splitCSV(cc)...)
+			recipients = append(recipients, splitCSV(bcc)...)
+			if err := checkGmailAllowlist(u, recipients); err != nil {
+				return err
+			}
+			if err := requireGmailSendArm(); err != nil {
+				return err
+			}
+
 			svc, err := newGmailService(cmd.Context(), account)
 			if err != nil {
 				return err

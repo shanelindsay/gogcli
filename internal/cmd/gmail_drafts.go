@@ -265,6 +265,25 @@ func newGmailDraftsSendCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
+			draft, err := svc.Users.Drafts.Get("me", draftID).
+				Format("full").
+				Do()
+			if err != nil {
+				return err
+			}
+			recipients := make([]string, 0, 3)
+			if draft != nil && draft.Message != nil {
+				recipients = append(recipients, headerValue(draft.Message.Payload, "To"))
+				recipients = append(recipients, headerValue(draft.Message.Payload, "Cc"))
+				recipients = append(recipients, headerValue(draft.Message.Payload, "Bcc"))
+			}
+			if err := checkGmailAllowlist(u, recipients); err != nil {
+				return err
+			}
+			if err := requireGmailSendArm(); err != nil {
+				return err
+			}
+
 			msg, err := svc.Users.Drafts.Send("me", &gmail.Draft{Id: draftID}).Do()
 			if err != nil {
 				return err

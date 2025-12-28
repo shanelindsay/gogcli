@@ -19,6 +19,8 @@ func TestExecute_GmailThreadDraftsSend_JSON(t *testing.T) {
 	origNew := newGmailService
 	t.Cleanup(func() { newGmailService = origNew })
 
+	t.Setenv("GOG_GMAIL_ALLOWLIST_MODE", "off")
+
 	// Keep attachments out of real config.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
