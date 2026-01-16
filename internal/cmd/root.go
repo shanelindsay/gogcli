@@ -24,11 +24,28 @@ type rootFlags struct {
 	Verbose bool
 }
 
+func applyLegacyOutputFlag(flags *rootFlags, output string) error {
+	out := strings.TrimSpace(output)
+	if out == "" {
+		return nil
+	}
+	switch strings.ToLower(out) {
+	case "json":
+		flags.JSON = true
+	case "plain", "text", "tsv":
+		flags.Plain = true
+	default:
+		return fmt.Errorf("unsupported --output value %q (use --json or --plain)", output)
+	}
+	return nil
+}
+
 func Execute(args []string) error {
 	flags := rootFlags{Color: envOr("GOG_COLOR", "auto")}
 	envMode := outfmt.FromEnv()
 	flags.JSON = envMode.JSON
 	flags.Plain = envMode.Plain
+	var output string
 
 	// Avoid dangerous prefix-matching for commands (future-proofing).
 	cobra.EnablePrefixMatching = false
@@ -90,6 +107,9 @@ func Execute(args []string) error {
 	  gog --json drive ls --max 5 | jq .
 	`),
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := applyLegacyOutputFlag(&flags, output); err != nil {
+				return err
+			}
 			logLevel := slog.LevelWarn
 			if flags.Verbose {
 				logLevel = slog.LevelDebug
@@ -126,6 +146,8 @@ func Execute(args []string) error {
 	root.PersistentFlags().StringVar(&flags.Color, "color", flags.Color, "Color output: auto|always|never")
 	root.PersistentFlags().StringVar(&flags.Account, "account", "", "Account email for API commands (gmail/calendar/drive/docs/slides/contacts/tasks/people/sheets)")
 	root.PersistentFlags().BoolVar(&flags.JSON, "json", flags.JSON, "Output JSON to stdout (best for scripting)")
+	root.PersistentFlags().StringVar(&output, "output", "", "Deprecated: use --json or --plain")
+	_ = root.PersistentFlags().MarkHidden("output")
 	root.PersistentFlags().BoolVar(&flags.Plain, "plain", flags.Plain, "Output stable, parseable text to stdout (TSV; no colors)")
 	root.PersistentFlags().BoolVar(&flags.Force, "force", false, "Skip confirmations for destructive commands")
 	root.PersistentFlags().BoolVar(&flags.NoInput, "no-input", false, "Never prompt; fail instead (useful for CI)")

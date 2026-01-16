@@ -70,11 +70,19 @@ func OpenDefault() (Store, error) {
 		fileDir = keyringDir
 	}
 
+	// If a file keyring dir/password is explicitly set, prefer the file backend.
+	// This avoids hanging on secret-service in headless/non-interactive sessions.
+	var allowedBackends []keyring.BackendType
+	if strings.TrimSpace(os.Getenv("GOG_KEYRING_FILE_DIR")) != "" || strings.TrimSpace(os.Getenv(keyringPasswordEnv)) != "" {
+		allowedBackends = []keyring.BackendType{keyring.FileBackend}
+	}
+
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:              config.AppName,
 		KeychainTrustApplication: runtime.GOOS == "darwin",
 		FileDir:                  fileDir,
 		FilePasswordFunc:         fileKeyringPasswordFunc(),
+		AllowedBackends:          allowedBackends,
 	})
 	if err != nil {
 		return nil, err
